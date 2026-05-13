@@ -1,0 +1,16 @@
+[Unit]
+Description=Spotify Wallpaper Plugin for Caelestia
+Documentation=https://github.com/caelestia-dots/caelestia
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/spotify-wallpaper
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical-session.target

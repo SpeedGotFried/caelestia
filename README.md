@@ -87,6 +87,30 @@ spicetify config current_theme caelestia color_scheme caelestia custom_apps mark
 spicetify apply
 ```
 
+#### Installing the Spotify Wallpaper Plugin:
+
+The `--spotify-plugin` flag installs the album-art wallpaper daemon that:
+- Fetches album art when a track plays on Spotify
+- Builds a blurred, darkened full-screen wallpaper with a rounded album art card
+- Optionally matches your Caelestia colour scheme to the dominant album colour
+- Restores your original wallpaper and scheme when Spotify pauses or closes
+
+Run:
+
+```sh
+./install.fish --spotify-plugin
+```
+
+This will:
+1. Check dependencies (`playerctl`, `imagemagick`, `curl`, `python3`)
+2. Install the daemon to `~/.local/bin/spotify-wallpaper`
+3. Copy the default config to `~/.config/caelestia/spotify-plugin.conf`
+4. Install and enable a `systemd --user` service (`spotify-wallpaper`)
+5. Patch the Caelestia shell's `PaneRegistry.qml` and install the settings pane
+
+Edit `~/.config/caelestia/spotify-plugin.conf` to customise the plugin.
+View logs with `journalctl --user -u spotify-wallpaper -f`.
+
 #### Installing VSCode/VSCodium configs:
 
 Install VSCode or VSCodium, then copy or symlink `vscode/settings.json` and

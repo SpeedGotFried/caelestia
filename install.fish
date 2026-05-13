@@ -4,6 +4,7 @@ argparse -n 'install.fish' -X 0 \
     'h/help' \
     'noconfirm' \
     'spotify' \
+    'spotify-plugin' \
     'vscode=?!contains -- "$_flag_value" codium code' \
     'discord' \
     'zen' \
@@ -13,12 +14,13 @@ or exit
 
 # Print help
 if set -q _flag_h
-    echo 'usage: ./install.sh [-h] [--noconfirm] [--spotify] [--vscode] [--discord] [--aur-helper]'
+    echo 'usage: ./install.sh [-h] [--noconfirm] [--spotify] [--spotify-plugin] [--vscode] [--discord] [--aur-helper]'
     echo
     echo 'options:'
     echo '  -h, --help                  show this help message and exit'
     echo '  --noconfirm                 do not confirm package installation'
     echo '  --spotify                   install Spotify (Spicetify)'
+    echo '  --spotify-plugin            install the Spotify wallpaper plugin (album art daemon + control-centre pane)'
     echo '  --vscode=[codium|code]      install VSCodium (or VSCode)'
     echo '  --discord                   install Discord (OpenAsar + Equicord)'
     echo '  --zen                       install Zen browser'
@@ -296,6 +298,79 @@ if set -q _flag_zen
 
     # Prompt user to install extension
     log 'Please install the CaelestiaFox extension from https://addons.mozilla.org/en-US/firefox/addon/caelestiafox if you have not already done so.'
+end
+
+# Install spotify-plugin-caelestia (wallpaper daemon + control-centre pane)
+if set -q _flag_spotify_plugin
+    log 'Installing Spotify wallpaper plugin...'
+
+    # ── Dependency check ───────────────────────────────────────────
+    set -l plugin_deps playerctl magick curl python3
+    set -l plugin_missing
+    for dep in $plugin_deps
+        if not command -q $dep
+            set -a plugin_missing $dep
+        end
+    end
+    if test (count $plugin_missing) -gt 0
+        log "Missing plugin dependencies: $plugin_missing"
+        log 'Install them first (e.g. paru -S playerctl imagemagick curl python), then re-run with --spotify-plugin.'
+    else
+        # ── Binary ─────────────────────────────────────────────────
+        set -l bin_dir $HOME/.local/bin
+        mkdir -p $bin_dir
+        install -m 755 (realpath hypr/scripts/spotify-wallpaper) $bin_dir/spotify-wallpaper
+        log "Installed daemon → $bin_dir/spotify-wallpaper"
+
+        # ── Config (first-run only, so user edits are preserved) ───
+        set -q XDG_CONFIG_HOME && set -l cfg_dir $XDG_CONFIG_HOME/caelestia || set -l cfg_dir $HOME/.config/caelestia
+        mkdir -p $cfg_dir
+        if not test -f $cfg_dir/spotify-plugin.conf
+            install -m 644 (realpath hypr/spotify/spotify-plugin.conf) $cfg_dir/spotify-plugin.conf
+            log "Installed config → $cfg_dir/spotify-plugin.conf"
+        else
+            log "Config already exists — skipping (edit manually if needed): $cfg_dir/spotify-plugin.conf"
+        end
+
+        # ── Systemd service ────────────────────────────────────────
+        set -l svc_dir $HOME/.config/systemd/user
+        mkdir -p $svc_dir
+        install -m 644 (realpath hypr/systemd/spotify-wallpaper.service) $svc_dir/spotify-wallpaper.service
+        log "Installed service → $svc_dir/spotify-wallpaper.service"
+        systemctl --user daemon-reload
+        systemctl --user enable --now spotify-wallpaper
+        log 'Service enabled and started'
+
+        # ── Caelestia shell QML pane (requires sudo) ───────────────
+        set -l qs_base /etc/xdg/quickshell/caelestia/modules/controlcenter
+        set -l qs_spotify $qs_base/spotify
+        set -l qs_registry $qs_base/PaneRegistry.qml
+
+        if not test -d $qs_base
+            log 'Caelestia QML dir not found — skipping GUI pane install.'
+            log 'Install the caelestia-shell package first, then re-run with --spotify-plugin.'
+        else
+            # Back up PaneRegistry once
+            if not test -f $qs_registry.bak
+                sudo cp $qs_registry $qs_registry.bak
+                log 'Backed up PaneRegistry.qml'
+            end
+
+            # Patch: append spotify entry if not already present
+            if not grep -q '"spotify"' $qs_registry
+                sudo sed -i 's|// ── spotify-plugin-caelestia .*||; /readonly property list<QtObject> panes/,/^    \]/ s|^    \]|        // ── spotify-plugin-caelestia\n        QtObject {\n            readonly property string id: "spotify"\n            readonly property string label: "spotify"\n            readonly property string icon: "music_note"\n            readonly property string component: "spotify/SpotifyPane.qml"\n        }\n    ]|' $qs_registry 2>/dev/null
+                log 'Patched PaneRegistry.qml — spotify pane registered'
+            else
+                log 'PaneRegistry.qml already contains spotify entry — skipping patch'
+            end
+
+            # Install the pane QML
+            sudo mkdir -p $qs_spotify
+            sudo install -m 644 (realpath qml/spotify/SpotifyPane.qml) $qs_spotify/SpotifyPane.qml
+            log "Installed SpotifyPane.qml → $qs_spotify/"
+            log 'Restart the shell to pick up the new pane: caelestia shell restart'
+        end
+    end
 end
 
 # Generate scheme stuff if needed

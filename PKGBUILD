@@ -23,4 +23,7 @@ optdepends=('thunar: file manager'
             'gnome-keyring: keyring daemon'
             'polkit-gnome: gnome polkit client'
             'direnv: isolated dev envs'
-            'zoxide: better cd')
+            'zoxide: better cd'
+            'playerctl: spotify wallpaper plugin — reads MPRIS metadata'
+            'imagemagick: spotify wallpaper plugin — builds composite wallpaper'
+            'curl: spotify wallpaper plugin — downloads album art')
